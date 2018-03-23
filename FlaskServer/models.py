@@ -1,10 +1,24 @@
 from flask_sqlalchemy import SQLAlchemy
-from main import app
+from flask_login import UserMixin
+from .extensions import bcrypt
 
-db = SQLAlchemy(app)
+
+db = SQLAlchemy()
 
 
-class User(db.Model):
+posts_tags = db.Table(
+    'posts_tag',
+    db.Column('post_id', db.String(45), db.ForeignKey('posts.id')),
+    db.Column('tag_id', db.String(45), db.ForeignKey('tags.id'))
+)
+
+users_roles = db.Table(
+    'users_roles',
+    db.Column('user_id', db.String(45), db.ForeignKey('users.id')),
+    db.Column('role_id', db.String(45), db.ForeignKey('roles.id'))
+)
+
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.String(45), primary_key=True)
     username = db.Column(db.String(255))
@@ -14,20 +28,40 @@ class User(db.Model):
         backref='users',
         lazy='dynamic'
     )
+    roles = db.relationship(
+        'Role',
+        secondary=users_roles,
+        backref=db.backref('users', lazy='dynamic')
+    )
 
     def __init__(self, id, username, password):
         self.id = id
         self.username = username
-        self.password = password
+        self.password = self.set_password(password)
 
     def __repr__(self):
         return "<Model User `{}`".format(self.username)
 
-posts_tags = db.Table(
-    'posts_tag',
-    db.Column('post_id', db.String(45), db.ForeignKey('posts.id')),
-    db.Column('tag_id', db.String(45), db.ForeignKey('tags.id'))
-)
+    def set_password(self, password):
+        return bcrypt.generate_password_hash(password)
+
+    def check_password(self, password):
+        return bcrypt.check_password_hash(self.password, password)
+
+
+class Role(db.Model):
+    __tablename__ = 'roles'
+
+    id = db.Column(db.String(45), primary_key=True)
+    name = db.Column(db.String(255), unique=True)
+    description = db.Column(db.String(255))
+
+    def __init__(self, id, name):
+        self.id = id
+        self.name = name
+
+    def __repr__(self):
+        return "<Model Role `{}`>".format(self.name)
 
 class Post(db.Model):
     __tablename__ = 'posts'
@@ -47,7 +81,8 @@ class Post(db.Model):
         backref=db.backref('posts', lazy='dynamic')
     )
 
-    def __init__(self, title):
+    def __init__(self, id, title):
+        self.id = id
         self.title = title
 
     def __repr__(self):
@@ -58,7 +93,8 @@ class Tag(db.Model):
     id = db.Column(db.String(45), primary_key=True)
     name = db.Column(db.String(255))
 
-    def __init__(self, name):
+    def __init__(self, id, name):
+        self.id = id
         self.name = name
 
     def __repr__(self):
@@ -72,7 +108,8 @@ class Comment(db.Model):
     date = db.Column(db.DateTime())
     post_id = db.Column(db.String(45), db.ForeignKey('posts.id'))
 
-    def __init__(self, name):
+    def __init__(self, id, name):
+        self.id = id
         self.name = name
 
     def __repr__(self):
